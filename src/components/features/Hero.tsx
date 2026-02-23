@@ -1,5 +1,8 @@
+"use client";
+
 import { Button } from "@/components/ui/button"
 import { motion } from "framer-motion"
+import heroImage from '@/assets/freefall-formation.png'
 
 export function Hero() {
     return (
@@ -8,7 +11,10 @@ export function Hero() {
             <div className="absolute inset-0 z-0">
                 <div className="absolute inset-0 bg-gradient-to-b from-black/60 to-background/90 z-10" />
                 {/* In production, this would be a <video> tag */}
-                <div className="h-full w-full bg-[url('https://images.unsplash.com/photo-1529511582893-2d7e684dd128?q=80&w=2533&auto=format&fit=crop')] bg-cover bg-center animate-slow-zoom" />
+                <div
+                    className="h-full w-full bg-cover bg-center animate-slow-zoom"
+                    style={{ backgroundImage: `url(${heroImage})` }}
+                />
             </div>
 
             {/* Content */}

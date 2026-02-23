@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from 'react';
 import { CloudSun, Wind, Thermometer, Check, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
