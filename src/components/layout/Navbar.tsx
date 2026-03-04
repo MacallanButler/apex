@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { RoleSwitcher } from '@/components/features/RoleSwitcher';
 
 export function Navbar() {
     const [isScrolled, setIsScrolled] = useState(false);
@@ -39,6 +40,7 @@ export function Navbar() {
                     <Link href="#instructors" className="text-foreground hover:text-primary transition-colors">Instructors</Link>
                     <Link href="#safety" className="text-foreground hover:text-primary transition-colors">Safety</Link>
                     <Link href="#faq" className="text-foreground hover:text-primary transition-colors">FAQ</Link>
+                    <RoleSwitcher />
                     <Button>Book Now</Button>
                 </div>
 
@@ -58,6 +60,7 @@ export function Navbar() {
                     <Link href="#instructors" className="text-foreground hover:text-primary transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Instructors</Link>
                     <Link href="#safety" className="text-foreground hover:text-primary transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Safety</Link>
                     <Link href="#faq" className="text-foreground hover:text-primary transition-colors" onClick={() => setIsMobileMenuOpen(false)}>FAQ</Link>
+                    <RoleSwitcher />
                     <Button className="w-full">Book Now</Button>
                 </div>
             )}
