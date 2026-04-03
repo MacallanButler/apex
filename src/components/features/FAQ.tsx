@@ -7,7 +7,7 @@ export function FAQ() {
             <div className="container mx-auto px-4 grid grid-cols-1 lg:grid-cols-2 gap-12">
 
                 {/* Anxiety FAQ */}
-                <div>
+                <div className="pt-8 lg:ml-12 xl:ml-20">
                     <h2 className="text-3xl font-heading font-bold text-white mb-8">
                         FIRST-TIMER <span className="text-primary">ANXIETY?</span>
                     </h2>

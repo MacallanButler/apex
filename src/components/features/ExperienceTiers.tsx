@@ -50,7 +50,7 @@ export function ExperienceTiers() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     {tiers.map((tier, i) => (
-                        <Card key={i} className={`bg-card/50 border-white/10 hover:border-primary/50 transition-all duration-300 relative ${tier.featured ? 'border-primary shadow-lg shadow-primary/10' : ''}`}>
+                        <Card key={i} className={`bg-card/50 border-white/10 hover:border-primary/50 transition-all duration-300 relative flex flex-col h-full ${tier.featured ? 'border-primary shadow-lg shadow-primary/10' : ''}`}>
                             {tier.featured && (
                                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-primary text-primary-foreground text-xs font-bold rounded-full uppercase tracking-wider">
                                     Most Popular
@@ -64,7 +64,7 @@ export function ExperienceTiers() {
                                 </div>
                                 <CardDescription>{tier.desc}</CardDescription>
                             </CardHeader>
-                            <CardContent>
+                            <CardContent className="flex-grow">
                                 <ul className="space-y-3">
                                     {tier.features.map((f, j) => (
                                         <li key={j} className="flex items-center gap-2 text-sm text-gray-300">

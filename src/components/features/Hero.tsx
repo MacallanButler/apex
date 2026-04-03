@@ -38,8 +38,10 @@ export function Hero() {
                         The sky is not the limit—it's just the beginning.
                     </p>
                     <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
-                        <Button size="lg" className="w-full sm:w-auto text-lg px-8 py-6 rounded-none skew-x-[-12deg] hover:skew-x-0 transition-transform duration-300 border-2 border-primary bg-primary text-white hover:bg-transparent hover:text-primary">
-                            <span className="skew-x-[12deg] hover:skew-x-0 inline-block">Book Your Jump</span>
+                        <Button size="lg" className="w-full sm:w-auto text-lg px-8 py-6 rounded-none skew-x-[-12deg] hover:skew-x-0 transition-transform duration-300 border-2 border-primary bg-primary text-white hover:bg-transparent hover:text-primary" asChild>
+                            <a href="#book">
+                                <span className="skew-x-[12deg] hover:skew-x-0 inline-block">Book Your Jump</span>
+                            </a>
                         </Button>
                         <Button size="lg" variant="outline" className="w-full sm:w-auto text-lg px-8 py-6 rounded-none skew-x-[-12deg] hover:skew-x-0 transition-transform duration-300 border-2 border-white text-white hover:bg-white hover:text-black">
                             <span className="skew-x-[12deg] hover:skew-x-0 inline-block">Experience Video</span>

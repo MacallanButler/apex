@@ -1,1 +1,0 @@
-(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push(["object"==typeof document?document.currentScript:void 0,68713,e=>{e.v("/_next/static/media/freefall-formation.37bce61d.png")}]);

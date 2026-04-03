@@ -41,7 +41,9 @@ export function Navbar() {
                     <Link href="#safety" className="text-foreground hover:text-primary transition-colors">Safety</Link>
                     <Link href="#faq" className="text-foreground hover:text-primary transition-colors">FAQ</Link>
                     <RoleSwitcher />
-                    <Button>Book Now</Button>
+                    <Button asChild>
+                        <Link href="#book">Book Now</Link>
+                    </Button>
                 </div>
 
                 {/* Mobile Menu Toggle */}
@@ -61,7 +63,9 @@ export function Navbar() {
                     <Link href="#safety" className="text-foreground hover:text-primary transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Safety</Link>
                     <Link href="#faq" className="text-foreground hover:text-primary transition-colors" onClick={() => setIsMobileMenuOpen(false)}>FAQ</Link>
                     <RoleSwitcher />
-                    <Button className="w-full">Book Now</Button>
+                    <Button className="w-full" asChild>
+                        <Link href="#book" onClick={() => setIsMobileMenuOpen(false)}>Book Now</Link>
+                    </Button>
                 </div>
             )}
         </nav>

@@ -51,7 +51,7 @@ export function TrustSafety() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
 
                     {/* Instructors */}
-                    <div>
+                    <div id="instructors">
                         <h3 className="text-3xl font-heading font-bold text-white mb-8 flex items-center gap-3">
                             <Users className="text-primary" /> Meet Your Instructors
                         </h3>
