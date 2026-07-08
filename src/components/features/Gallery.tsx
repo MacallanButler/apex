@@ -13,21 +13,21 @@ export function Gallery() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 h-96 md:h-[600px]">
                     <div
                         className="col-span-2 row-span-2 bg-cover bg-center rounded-2xl hover:scale-[1.02] transition-transform duration-500 cursor-pointer relative group"
-                        style={{ backgroundImage: `url(${canopySunset})` }}
+                        style={{ backgroundImage: `url(${canopySunset.src})` }}
                     >
                         <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors" />
                     </div>
                     <div
                         className="bg-cover bg-center rounded-2xl hover:scale-[1.02] transition-transform duration-500 cursor-pointer"
-                        style={{ backgroundImage: `url(${planeDoor})` }}
+                        style={{ backgroundImage: `url(${planeDoor.src})` }}
                     />
                     <div
                         className="bg-cover bg-center rounded-2xl hover:scale-[1.02] transition-transform duration-500 cursor-pointer"
-                        style={{ backgroundImage: `url(${altimeterWrist})` }}
+                        style={{ backgroundImage: `url(${altimeterWrist.src})` }}
                     />
                     <div
                         className="col-span-2 bg-cover bg-center rounded-2xl hover:scale-[1.02] transition-transform duration-500 cursor-pointer"
-                        style={{ backgroundImage: `url(${dropzoneHangar})` }}
+                        style={{ backgroundImage: `url(${dropzoneHangar.src})` }}
                     />
                 </div>
             </div>
