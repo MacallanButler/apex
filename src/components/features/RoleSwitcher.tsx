@@ -5,12 +5,11 @@ import { ChevronDown } from "lucide-react"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 
-const roles: UserRole[] = ["Guest", "Student", "Instructor", "Admin"]
+const roles: UserRole[] = ["Student", "Instructor", "Admin"]
 
 const roleDescriptions: Record<UserRole, string> = {
-    Guest: "Browse only — no booking access",
-    Student: "Book Tandem & Solo jumps",
-    Instructor: "All bookings + manifest view",
+    Student: "Browse, view safety & book jumps",
+    Instructor: "View manifest & manage bookings",
     Admin: "Full access — all features unlocked",
 }
 

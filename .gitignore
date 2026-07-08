@@ -22,3 +22,15 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Next.js build output and dependencies
+.next/
+node_modules/
+dist/
+dist-ssr/
+*.tsbuildinfo
+src.zip
+
+# Env variables
+.env*.local
+*.local

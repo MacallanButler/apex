@@ -13,7 +13,7 @@ export function Hero() {
                 {/* In production, this would be a <video> tag */}
                 <div
                     className="h-full w-full bg-cover bg-center animate-slow-zoom"
-                    style={{ backgroundImage: `url(${heroImage})` }}
+                    style={{ backgroundImage: `url(${heroImage.src})` }}
                 />
             </div>
 

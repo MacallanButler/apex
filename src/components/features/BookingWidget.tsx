@@ -1,385 +1,465 @@
 "use client";
 
-import { useState } from 'react';
-import { CloudSun, Wind, Thermometer, Check, RefreshCw, ChevronRight, CheckCircle2, User, Users } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Calendar } from '@/components/ui/calendar';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
-import { useLiveWeather } from "@/hooks/useLiveWeather";
-import { getSlotAvailability, getStatusColor } from "@/lib/scheduling";
+import { supabase } from "@/lib/supabase";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { ChevronRight, CalendarIcon, UserIcon, ShieldAlert, Clock } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { ComplianceChecklist } from "@/components/features/ComplianceChecklist";
-import { useRoleStore, hasAccess, roleColors } from "@/lib/rbac";
+import { useUser } from "@/lib/UserContext";
 
-const steps = [
-    { id: 1, name: "Date" },
-    { id: 2, name: "Package" },
-    { id: 3, name: "Instructor" },
-    { id: 4, name: "Compliance" },
-    { id: 5, name: "Confirm" }
-];
+interface Slot {
+  id: string;
+  time: string;
+  capacity: number;
+  remaining?: number;
+}
+
+interface Booking {
+  id: string;
+  user_id: string;
+  date: string;
+  time: string;
+  package: string;
+  instructor: string;
+  extras: string[];
+  total: number;
+  status?: string;
+  student_email?: string;
+}
 
 export function BookingWidget() {
-    const [step, setStep] = useState(1);
-    const [date, setDate] = useState<Date | undefined>(new Date());
-    const [selectedPackage, setSelectedPackage] = useState('tandem');
-    const [selectedInstructor, setSelectedInstructor] = useState('any');
-    const [complianceCleared, setComplianceCleared] = useState(false);
+  const { user } = useUser();
+  const [step, setStep] = useState(1);
+  const [date, setDate] = useState<Date | undefined>(new Date());
+  const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const [slots, setSlots] = useState<Slot[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [selectedPackage, setSelectedPackage] = useState("tandem");
+  const [selectedInstructor, setSelectedInstructor] = useState("any");
+  const [selectedExtras, setSelectedExtras] = useState<string[]>([]);
+  const [complianceCleared, setComplianceCleared] = useState(false);
+  const [guestEmail, setGuestEmail] = useState("");
 
-    const weather = useLiveWeather(4000);
-    const { role } = useRoleStore();
-    
-    // Everyone can book now, even Guests
-    const canBook = true;
+  const packages = {
+    tandem: { price: 249, name: "Tandem Jump", desc: "First time, attached to instructor." },
+    solo: { price: 189, name: "Solo Jump", desc: "Licensed skydivers only." },
+    sunset: { price: 299, name: "Sunset Jump", desc: "Golden hour premium." },
+  };
 
-    const slots = date ? getSlotAvailability(date, weather.status) : null;
+  const extras = [
+    { id: "video", name: "Handcam Video", price: 99 },
+    { id: "photos", name: "Photos", price: 79 },
+    { id: "insurance", name: "Insurance", price: 29 },
+  ];
 
-    const packages = {
-        tandem: { price: 249, name: "Tandem Jump", desc: "For your first time. Attached to an instructor." },
-        solo: { price: 189, name: "Solo License Jump", desc: "For licensed skydivers." },
-        sunset: { price: 299, name: "Sunset Gold Jump", desc: "Premium experience at golden hour." }
-    };
+  const instructors = [
+    { id: "any", name: "Any Available" },
+    { id: "sarah", name: "Sarah Connor" },
+    { id: "mike", name: "Mike Johnson" },
+  ];
 
-    const extras = [
-        { id: 'video', name: 'Handcam Video', price: 99 },
-        { id: 'photos', name: 'High-Res Photos', price: 79 },
-        { id: 'insurance', name: 'Jump Insurance', price: 29 }
-    ];
-
-    const instructors = [
-        { id: 'any', name: 'Any Available (Recommended)' },
-        { id: 'sarah', name: "Sarah 'Hawk' Connor" },
-        { id: 'mike', name: "Mike 'Drop' Johnson" },
-        { id: 'elena', name: "Elena Rodriguez" },
-    ];
-
-    const [selectedExtras, setSelectedExtras] = useState<string[]>([]);
-    const toggleExtra = (id: string) => {
-        setSelectedExtras(prev =>
-            prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-        );
-    };
-
-    const totalPrice = packages[selectedPackage as keyof typeof packages].price +
-        selectedExtras.reduce((acc, curr) => acc + (extras.find(e => e.id === curr)?.price || 0), 0);
-
-    const weatherBorderColor = {
-        green: "border-green-500/20 bg-green-950/20",
-        yellow: "border-yellow-500/20 bg-yellow-950/20",
-        red: "border-red-500/20 bg-red-950/20",
-    }[weather.statusColor];
-
-    const weatherTextColor = {
-        green: "text-green-400",
-        yellow: "text-yellow-400",
-        red: "text-red-400",
-    }[weather.statusColor];
-
-    const nextStep = () => setStep(prev => Math.min(prev + 1, 5));
-    const prevStep = () => setStep(prev => Math.max(prev - 1, 1));
-
-    return (
-        <section className="py-20 bg-neutral-900 border-t border-white/5" id="book">
-            <div className="container mx-auto px-4 max-w-5xl">
-                <div className="text-center mb-12">
-                    <h2 className="text-4xl font-heading font-bold text-white mb-4">
-                        SECURE YOUR <span className="text-primary">DROP</span>
-                    </h2>
-                    <p className="text-muted-foreground">Real-time availability. Instant confirmation. No hidden fees.</p>
-
-                    {/* Role indicator */}
-                    <div className="mt-4 flex justify-center items-center gap-2 text-xs text-muted-foreground">
-                        <span>Viewing as:</span>
-                        <span className={cn("font-semibold px-2 py-0.5 rounded-full text-xs", roleColors[role])}>
-                            {role}
-                        </span>
-                    </div>
-                </div>
-
-                {/* Progress Stepper */}
-                <div className="mb-12">
-                    <div className="flex items-center justify-between relative">
-                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-white/10 rounded-full" />
-                        <div 
-                            className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-primary rounded-full transition-all duration-500"
-                            style={{ width: `${((step - 1) / 4) * 100}%` }}
-                        />
-                        {steps.map((s, i) => (
-                            <div key={s.id} className="relative z-10 flex flex-col items-center gap-2">
-                                <div className={cn(
-                                    "w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-colors",
-                                    step >= s.id ? "bg-primary text-white" : "bg-neutral-800 text-muted-foreground border border-white/10"
-                                )}>
-                                    {step > s.id ? <CheckCircle2 className="w-5 h-5" /> : s.id}
-                                </div>
-                                <span className={cn(
-                                    "text-xs font-semibold absolute -bottom-6 whitespace-nowrap",
-                                    step >= s.id ? "text-primary" : "text-muted-foreground"
-                                )}>
-                                    {s.name}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="mt-16 bg-card border border-white/10 rounded-2xl p-6 md:p-8">
-                    
-                    {/* STEP 1: DATE & WEATHER */}
-                    {step === 1 && (
-                        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            <h3 className="text-2xl font-bold text-white mb-6">Choose Your Date</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <div className="space-y-6">
-                                    <div className="bg-neutral-900/50 rounded-xl p-4 border border-white/5">
-                                        <Calendar
-                                            mode="single"
-                                            selected={date}
-                                            onSelect={setDate}
-                                            className="w-full"
-                                            classNames={{
-                                                months: "w-full",
-                                                month: "w-full",
-                                                table: "w-full border-collapse space-y-1",
-                                                head_row: "flex w-full justify-between",
-                                                head_cell: "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]",
-                                                row: "flex w-full mt-2 justify-between",
-                                            }}
-                                            disabled={(d) => d.getDay() === 1 || d < new Date()}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="space-y-6">
-                                    <Card className={cn("border", weatherBorderColor)}>
-                                        <CardHeader>
-                                            <CardTitle className={cn("flex items-center gap-2", weatherTextColor)}>
-                                                <CloudSun /> LIVE CONDITIONS
-                                                <RefreshCw className="w-3 h-3 ml-auto opacity-50 animate-spin" style={{ animationDuration: "4s" }} />
-                                            </CardTitle>
-                                            <CardDescription>Updates every 4 seconds</CardDescription>
-                                        </CardHeader>
-                                        <CardContent className="space-y-4">
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2 text-white">
-                                                    <Wind className="text-muted-foreground w-5 h-5" /> Wind
-                                                </div>
-                                                <span className={cn("font-mono font-bold", weatherTextColor)}>{weather.windKts} kts</span>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2 text-white">
-                                                    <CloudSun className="text-muted-foreground w-5 h-5" /> Ceiling
-                                                </div>
-                                                <span className={cn("font-mono font-bold", weatherTextColor)}>{weather.ceilingFt.toLocaleString()} ft</span>
-                                            </div>
-                                            <div className="pt-4 border-t border-white/10">
-                                                <Badge variant="outline" className={cn("w-full justify-center py-1", weatherTextColor, `border-current/30`)}>
-                                                    STATUS: {weather.status}
-                                                </Badge>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-
-                                    {slots && (
-                                        <Card className="bg-neutral-900/50 border-white/10">
-                                            <CardContent className="pt-6">
-                                                <div className="flex items-center justify-between mb-3">
-                                                    <span className="text-sm text-white">Slot Availability</span>
-                                                    <span className={cn("font-bold text-sm", getStatusColor(slots.status))}>
-                                                        {slots.status}
-                                                    </span>
-                                                </div>
-                                                {slots.maxSlots > 0 && (
-                                                    <p className="text-xs text-muted-foreground">
-                                                        {slots.slotsRemaining} of {slots.maxSlots} slots remaining
-                                                    </p>
-                                                )}
-                                            </CardContent>
-                                        </Card>
-                                    )}
-
-                                </div>
-                            </div>
-                            <div className="mt-8 flex justify-end">
-                                <Button 
-                                    size="lg" 
-                                    onClick={nextStep} 
-                                    disabled={!date || slots?.status === "Full" || slots?.status === "Closed"}
-                                >
-                                    Next: Choose Experience <ChevronRight className="w-4 h-4 ml-2" />
-                                </Button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* STEP 2: PACKAGE & EXTRAS */}
-                    {step === 2 && (
-                        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            <h3 className="text-2xl font-bold text-white mb-6">Select Your Package</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <div className="space-y-4">
-                                    <label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Experience Level</label>
-                                    {Object.entries(packages).map(([key, pkg]) => (
-                                        <div
-                                            key={key}
-                                            className={cn(
-                                                "cursor-pointer p-4 rounded-xl border-2 transition-all",
-                                                selectedPackage === key
-                                                    ? "bg-primary/10 border-primary text-white"
-                                                    : "bg-neutral-900/50 border-white/10 hover:border-white/30 text-muted-foreground"
-                                            )}
-                                            onClick={() => setSelectedPackage(key)}
-                                        >
-                                            <div className="flex justify-between items-center mb-1">
-                                                <span className="font-bold text-lg">{pkg.name}</span>
-                                                <span className="font-bold text-white">${pkg.price}</span>
-                                            </div>
-                                            <p className="text-sm opacity-80">{pkg.desc}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="space-y-4">
-                                    <label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Add-ons</label>
-                                    {extras.map(extra => (
-                                        <div
-                                            key={extra.id}
-                                            className={cn(
-                                                "cursor-pointer p-4 rounded-xl border transition-all flex items-center justify-between",
-                                                selectedExtras.includes(extra.id) 
-                                                    ? "bg-primary/20 border-primary text-white" 
-                                                    : "bg-neutral-900/50 border-white/10 hover:bg-white/5 text-muted-foreground"
-                                            )}
-                                            onClick={() => toggleExtra(extra.id)}
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <div className={cn("w-5 h-5 rounded border flex items-center justify-center", selectedExtras.includes(extra.id) ? "bg-primary border-primary" : "border-white/30")}>
-                                                    {selectedExtras.includes(extra.id) && <Check className="w-3 h-3 text-white" />}
-                                                </div>
-                                                <span className="font-medium">{extra.name}</span>
-                                            </div>
-                                            <span className="font-semibold text-white">+${extra.price}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                            <div className="mt-8 flex justify-between">
-                                <Button variant="outline" onClick={prevStep}>Back</Button>
-                                <Button size="lg" onClick={nextStep}>Next: Instructor Options <ChevronRight className="w-4 h-4 ml-2" /></Button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* STEP 3: INSTRUCTOR PREFERENCE */}
-                    {step === 3 && (
-                        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            <h3 className="text-2xl font-bold text-white mb-6">Instructor Preference</h3>
-                            <p className="text-muted-foreground mb-8">Unless you have a specific request, we will pair you with the best instructor available for your slot.</p>
-                            
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                {instructors.map(inst => (
-                                    <div
-                                        key={inst.id}
-                                        className={cn(
-                                            "cursor-pointer p-4 rounded-xl border-2 transition-all flex items-center gap-4",
-                                            selectedInstructor === inst.id
-                                                ? "bg-primary/10 border-primary text-white"
-                                                : "bg-neutral-900/50 border-white/10 hover:border-white/30 text-muted-foreground"
-                                        )}
-                                        onClick={() => setSelectedInstructor(inst.id)}
-                                    >
-                                        <div className="w-12 h-12 rounded-full bg-neutral-800 flex items-center justify-center border border-white/5">
-                                            {inst.id === 'any' ? <Users className="w-6 h-6 text-primary" /> : <User className="w-6 h-6 text-muted-foreground" />}
-                                        </div>
-                                        <div>
-                                            <div className="font-bold">{inst.name}</div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            <div className="mt-8 flex justify-between">
-                                <Button variant="outline" onClick={prevStep}>Back</Button>
-                                <Button size="lg" onClick={nextStep}>Next: Safety Requirements <ChevronRight className="w-4 h-4 ml-2" /></Button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* STEP 4: COMPLIANCE */}
-                    {step === 4 && (
-                        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-2xl mx-auto">
-                            <ComplianceChecklist onComplete={() => {
-                                setComplianceCleared(true);
-                                nextStep();
-                            }} />
-                            <div className="mt-6 flex justify-between">
-                                <Button variant="outline" onClick={prevStep}>Back</Button>
-                                {/* Next button is handled inside ComplianceChecklist initially, but we allow manual progress if already cleared */}
-                                {complianceCleared && (
-                                    <Button onClick={nextStep}>Skip to Confirm <ChevronRight className="w-4 h-4 ml-2" /></Button>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* STEP 5: CONFIRM */}
-                    {step === 5 && (
-                        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-lg mx-auto">
-                            <div className="text-center mb-8">
-                                <div className="w-16 h-16 bg-primary/20 text-primary rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <CheckCircle2 className="w-8 h-8" />
-                                </div>
-                                <h3 className="text-3xl font-bold text-white mb-2">Review & Confirm</h3>
-                                <p className="text-muted-foreground">You won't be charged until jump day.</p>
-                            </div>
-
-                            <Card className="bg-neutral-900/50 border-white/10 mb-8">
-                                <CardContent className="pt-6 space-y-4">
-                                    <div className="flex justify-between pb-4 border-b border-white/10">
-                                        <span className="text-muted-foreground">Date</span>
-                                        <span className="text-white font-medium">{date ? format(date, "PPP") : ""}</span>
-                                    </div>
-                                    <div className="flex justify-between pb-4 border-b border-white/10">
-                                        <span className="text-muted-foreground">Experience</span>
-                                        <span className="text-white font-medium">{packages[selectedPackage as keyof typeof packages].name}</span>
-                                    </div>
-                                    <div className="flex justify-between pb-4 border-b border-white/10">
-                                        <span className="text-muted-foreground">Instructor</span>
-                                        <span className="text-white font-medium">{instructors.find(i => i.id === selectedInstructor)?.name}</span>
-                                    </div>
-                                    {selectedExtras.length > 0 && (
-                                        <div className="flex justify-between pb-4 border-b border-white/10">
-                                            <span className="text-muted-foreground">Add-ons</span>
-                                            <div className="text-right">
-                                                {selectedExtras.map(id => (
-                                                    <div key={id} className="text-white text-sm">
-                                                        + {extras.find(e => e.id === id)?.name}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                    <div className="flex justify-between items-end pt-2">
-                                        <span className="text-lg font-medium text-white">Total Estimate</span>
-                                        <span className="text-3xl font-heading font-bold text-primary">${totalPrice}</span>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {hasAccess(role, "Instructor") && (
-                                <div className="mb-6 text-xs p-3 rounded-lg bg-amber-900/20 border border-amber-500/20 text-amber-300 text-center">
-                                    📋 Instructor view: This booking will appear on today's manifest.
-                                </div>
-                            )}
-
-                            <div className="flex gap-4">
-                                <Button variant="outline" className="w-full flex-1" onClick={prevStep}>Back</Button>
-                                <Button size="lg" className="w-full flex-2 font-bold text-lg text-white">CONFIRM BOOKING</Button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </div>
-        </section>
+  const totalPrice =
+    packages[selectedPackage as keyof typeof packages].price +
+    selectedExtras.reduce(
+      (acc, curr) => acc + (extras.find(e => e.id === curr)?.price || 0),
+      0
     );
+
+  const toggleExtra = (id: string) =>
+    setSelectedExtras(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+
+  const nextStep = () => setStep(s => Math.min(s + 1, 5));
+  const prevStep = () => setStep(s => Math.max(s - 1, 1));
+
+  // 🔹 Fetch available slots for selected date (accessible to guests)
+  useEffect(() => {
+    const fetchSlots = async () => {
+      if (!date) return;
+      setLoadingSlots(true);
+      const formatted = format(date, "yyyy-MM-dd");
+
+      const { data: slotData } = await supabase
+        .from("time_slots")
+        .select("*")
+        .eq("date", formatted);
+
+      const { data: bookingData } = await supabase
+        .from("bookings")
+        .select("time")
+        .eq("date", formatted);
+
+      const computed =
+        (slotData as Slot[])?.map(slot => {
+          const taken = (bookingData as Booking[])?.filter(b => b.time === slot.time).length ?? 0;
+          return { ...slot, remaining: slot.capacity - taken };
+        }) || [];
+
+      setSlots(computed);
+      setLoadingSlots(false);
+    };
+
+    fetchSlots();
+  }, [date]);
+
+  const handleConfirm = async () => {
+    if (!date || !selectedTime) return;
+
+    setSubmitting(true);
+    let currentUser = user;
+
+    // If guest, sign up/login first
+    if (!currentUser) {
+      if (!guestEmail) {
+        alert("Please enter your email to proceed.");
+        setSubmitting(false);
+        return;
+      }
+      const { error: signInError } = await supabase.auth.signInWithOtp({ email: guestEmail });
+      if (signInError) {
+        alert(`Error signing in: ${signInError.message}`);
+        setSubmitting(false);
+        return;
+      }
+      const { data: userData } = await supabase.auth.getUser();
+      currentUser = userData?.user;
+    }
+
+    if (!currentUser) {
+      alert("Failed to authenticate session.");
+      setSubmitting(false);
+      return;
+    }
+
+    const { error } = await supabase.from("bookings").insert({
+      user_id: currentUser.id,
+      student_email: currentUser.email,
+      date: format(date, "yyyy-MM-dd"),
+      time: selectedTime,
+      package: selectedPackage,
+      instructor: selectedInstructor,
+      extras: selectedExtras,
+      total: totalPrice,
+      status: "Scheduled"
+    });
+    
+    setSubmitting(false);
+
+    if (!error) {
+      alert("Booking confirmed! Welcome to Apex Drop.");
+      window.location.reload(); // Reload to sync navbar session
+    } else {
+      alert("Error confirming booking.");
+    }
+  };
+
+  return (
+    <section id="book" className="py-24 bg-neutral-950 text-white border-t border-white/5 relative overflow-hidden">
+      <div className="max-w-4xl mx-auto px-4 space-y-10">
+        
+        {/* Step Progress Bar */}
+        <div className="flex justify-between items-center max-w-md mx-auto mb-12">
+          {[1, 2, 3, 4, 5].map(s => (
+            <div key={s} className="flex items-center">
+              <div
+                className={cn(
+                  "w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all border",
+                  step >= s
+                    ? "bg-primary border-primary text-white shadow-lg shadow-primary/20"
+                    : "bg-zinc-900 border-white/10 text-zinc-500"
+                )}
+              >
+                {s}
+              </div>
+              {s < 5 && (
+                <div
+                  className={cn(
+                    "h-[2px] w-8 md:w-16 transition-colors",
+                    step > s ? "bg-primary" : "bg-zinc-800"
+                  )}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* STEP 1: DATE & TIME */}
+        {step === 1 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+            <div className="space-y-4">
+              <h3 className="text-3xl font-heading font-bold flex items-center gap-2">
+                <CalendarIcon className="text-primary w-8 h-8" /> Choose Date
+              </h3>
+              <p className="text-zinc-400 text-sm">
+                Select your jump date. Dropzone operates Tuesday through Sunday. Closed Mondays.
+              </p>
+              <div className="bg-neutral-900 p-4 rounded-2xl border border-white/10 flex justify-center shadow-xl">
+                <Calendar mode="single" selected={date} onSelect={setDate} />
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-3xl font-heading font-bold flex items-center gap-2">
+                <Clock className="text-primary w-8 h-8" /> Available Times
+              </h3>
+              <p className="text-zinc-400 text-sm">
+                {date ? `Showing availability for ${format(date, "MMMM d, yyyy")}` : "Select a date to view slots."}
+              </p>
+              <Card className="bg-neutral-900 border-white/10 text-white shadow-xl max-h-[300px] overflow-y-auto">
+                <CardContent className="space-y-3 pt-6">
+                  {loadingSlots && <div className="text-center py-6 text-zinc-500">Loading slots...</div>}
+                  {!loadingSlots && slots.length === 0 && (
+                    <div className="text-center py-6 text-zinc-500">No time slots available for this date.</div>
+                  )}
+                  {!loadingSlots &&
+                    slots.map(slot => {
+                      const isFull = (slot.remaining ?? 0) <= 0;
+                      return (
+                        <div
+                          key={slot.id}
+                          onClick={() => !isFull && setSelectedTime(slot.time)}
+                          className={cn(
+                            "p-4 border rounded-xl cursor-pointer flex justify-between items-center transition-all hover:bg-white/5",
+                            selectedTime === slot.time
+                              ? "border-primary bg-primary/10 text-white shadow-lg"
+                              : "border-white/10 text-zinc-300",
+                            isFull && "opacity-30 cursor-not-allowed hover:bg-transparent"
+                          )}
+                        >
+                          <span className="font-semibold">{slot.time}</span>
+                          <span className={cn("text-xs px-2.5 py-1 rounded-full font-bold", isFull ? "bg-zinc-800 text-zinc-500" : "bg-primary/20 text-primary")}>
+                            {isFull ? "Full" : `${slot.remaining} Slots Left`}
+                          </span>
+                        </div>
+                      );
+                    })}
+                </CardContent>
+              </Card>
+
+              <div className="pt-4 text-right">
+                <Button onClick={nextStep} disabled={!selectedTime} className="bg-primary hover:bg-primary/90 text-white px-8 py-5 text-base">
+                  Choose Experience <ChevronRight className="ml-2 w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 2: EXPERIENCE PACKAGES */}
+        {step === 2 && (
+          <div className="space-y-6">
+            <div className="text-center max-w-xl mx-auto space-y-2">
+              <h3 className="text-3xl font-heading font-bold">Choose Your Experience</h3>
+              <p className="text-zinc-400 text-sm">Select the package that fits your adrenaline levels. Pricing includes all safety gears and training.</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {Object.entries(packages).map(([key, pkg]) => (
+                <div
+                  key={key}
+                  onClick={() => setSelectedPackage(key)}
+                  className={cn(
+                    "p-6 border rounded-2xl cursor-pointer flex flex-col justify-between transition-all hover:scale-[1.02] shadow-xl",
+                    selectedPackage === key
+                      ? "border-primary bg-primary/5 text-white shadow-primary/10"
+                      : "border-white/10 bg-neutral-900/50 hover:bg-neutral-900"
+                  )}
+                >
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-start">
+                      <h4 className="font-bold text-xl text-white">{pkg.name}</h4>
+                      <span className="text-2xl font-bold text-primary">${pkg.price}</span>
+                    </div>
+                    <p className="text-sm text-zinc-400 leading-relaxed">{pkg.desc}</p>
+                  </div>
+                  <div className="mt-8">
+                    <span className={cn("w-full py-2.5 rounded-lg text-xs font-bold flex justify-center uppercase tracking-wider border", selectedPackage === key ? "bg-primary border-primary text-white" : "border-white/10 text-zinc-400")}>
+                      {selectedPackage === key ? "Selected" : "Select Package"}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-between pt-6">
+              <Button variant="outline" onClick={prevStep} className="border-white/10 text-white">
+                Back
+              </Button>
+              <Button onClick={nextStep} className="bg-primary hover:bg-primary/90 text-white px-8">
+                Select Instructor <ChevronRight className="ml-2 w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 3: INSTRUCTOR SELECTION */}
+        {step === 3 && (
+          <div className="space-y-6">
+            <div className="text-center max-w-xl mx-auto space-y-2">
+              <h3 className="text-3xl font-heading font-bold">Select Your Instructor</h3>
+              <p className="text-zinc-400 text-sm">Choose an elite pilot to jump with, or opt for any available instructor for maximum flexibility.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {instructors.map(i => (
+                <div
+                  key={i.id}
+                  onClick={() => setSelectedInstructor(i.id)}
+                  className={cn(
+                    "p-6 border rounded-2xl cursor-pointer flex flex-col items-center text-center transition-all hover:scale-[1.02] shadow-xl",
+                    selectedInstructor === i.id
+                      ? "border-primary bg-primary/5 text-white"
+                      : "border-white/10 bg-neutral-900/50 hover:bg-neutral-900"
+                  )}
+                >
+                  <div className="w-16 h-16 rounded-full bg-neutral-800 flex items-center justify-center font-bold text-xl text-zinc-400 border border-white/5 mb-4 uppercase">
+                    {i.name.charAt(0)}
+                  </div>
+                  <h4 className="font-bold text-lg text-white mb-2">{i.name}</h4>
+                  <p className="text-xs text-zinc-500 mb-6">
+                    {i.id === "any" ? "Best availability & faster booking" : "USPA Certified Tandem Master"}
+                  </p>
+                  <span className={cn("w-full py-2 rounded-lg text-xs font-bold flex justify-center uppercase tracking-wider border", selectedInstructor === i.id ? "bg-primary border-primary text-white" : "border-white/10 text-zinc-400")}>
+                    {selectedInstructor === i.id ? "Selected" : "Select"}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Extras Selection Embedded in Instructor Step for flow continuity */}
+            <div className="mt-12 bg-neutral-900 p-6 rounded-2xl border border-white/10 space-y-4">
+              <h4 className="font-bold text-xl text-white">Upgrade Your Experience</h4>
+              <p className="text-zinc-400 text-xs">Capture your jump forever with handcam footage, or add premium insurance coverage.</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                {extras.map(ex => (
+                  <div
+                    key={ex.id}
+                    onClick={() => toggleExtra(ex.id)}
+                    className={cn(
+                      "p-4 border rounded-xl cursor-pointer flex justify-between items-center transition-colors",
+                      selectedExtras.includes(ex.id)
+                        ? "border-primary bg-primary/10 text-white"
+                        : "border-white/5 bg-zinc-950 hover:bg-white/5"
+                    )}
+                  >
+                    <div>
+                      <span className="font-bold text-sm block">{ex.name}</span>
+                      <span className="text-zinc-400 text-xs">+${ex.price}</span>
+                    </div>
+                    <div className={cn("w-5 h-5 rounded border flex items-center justify-center text-xs font-bold", selectedExtras.includes(ex.id) ? "bg-primary border-primary text-white" : "border-white/20")}>
+                      {selectedExtras.includes(ex.id) && "✓"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-between pt-6">
+              <Button variant="outline" onClick={prevStep} className="border-white/10 text-white">
+                Back
+              </Button>
+              <Button onClick={nextStep} className="bg-primary hover:bg-primary/90 text-white px-8">
+                Compliance Checklist <ChevronRight className="ml-2 w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 4: COMPLIANCE CHECKLIST */}
+        {step === 4 && (
+          <div className="max-w-xl mx-auto bg-neutral-900 border border-white/10 p-6 md:p-8 rounded-2xl shadow-2xl">
+            <ComplianceChecklist
+              onComplete={() => {
+                setComplianceCleared(true);
+                nextStep();
+              }}
+            />
+          </div>
+        )}
+
+        {/* STEP 5: REVIEW & CHECKOUT */}
+        {step === 5 && (
+          <div className="max-w-xl mx-auto space-y-6">
+            <div className="text-center space-y-2">
+              <h3 className="text-3xl font-heading font-bold">Review Your Order</h3>
+              <p className="text-zinc-400 text-sm">Please verify your booking details before securing your slot.</p>
+            </div>
+
+            <div className="bg-neutral-900 p-6 rounded-2xl border border-white/10 space-y-4 shadow-xl">
+              <div className="flex justify-between border-b border-white/5 pb-2 text-sm">
+                <span className="text-zinc-400">Date & Time</span>
+                <span className="font-semibold text-white">
+                  {date ? format(date, "MMMM d, yyyy") : ""} at {selectedTime}
+                </span>
+              </div>
+              <div className="flex justify-between border-b border-white/5 pb-2 text-sm">
+                <span className="text-zinc-400">Jump Package</span>
+                <span className="font-semibold text-white uppercase text-xs tracking-wider">
+                  {packages[selectedPackage as keyof typeof packages].name}
+                </span>
+              </div>
+              <div className="flex justify-between border-b border-white/5 pb-2 text-sm">
+                <span className="text-zinc-400">Instructor Assigned</span>
+                <span className="font-semibold text-white">
+                  {selectedInstructor === "any" ? "Any Available" : instructors.find(i => i.id === selectedInstructor)?.name}
+                </span>
+              </div>
+              <div className="flex justify-between border-b border-white/5 pb-2 text-sm">
+                <span className="text-zinc-400">Add-ons (Extras)</span>
+                <span className="font-semibold text-white">
+                  {selectedExtras.length === 0
+                    ? "None"
+                    : selectedExtras.map(exId => extras.find(e => e.id === exId)?.name).join(", ")}
+                </span>
+              </div>
+              <div className="flex justify-between pt-2 text-xl font-bold border-t border-white/10">
+                <span>Total Amount</span>
+                <span className="text-primary">${totalPrice}</span>
+              </div>
+            </div>
+
+            {!user && (
+              <div className="space-y-3 bg-zinc-950 p-6 rounded-2xl border border-primary/20 shadow-inner">
+                <div className="flex items-center gap-2 text-primary">
+                  <UserIcon className="w-5 h-5" />
+                  <h4 className="font-bold text-white text-base">Secure Your Booking</h4>
+                </div>
+                <p className="text-zinc-400 text-xs leading-relaxed">
+                  Provide your email address to lock in this slot. This will instantly create your Student profile where you can view your schedule, sign waivers, and track jump video uploads.
+                </p>
+                <input
+                  type="email"
+                  placeholder="enter.your@email.com"
+                  value={guestEmail}
+                  onChange={(e) => setGuestEmail(e.target.value)}
+                  className="w-full mt-2 bg-neutral-900 border border-zinc-800 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                  required
+                />
+              </div>
+            )}
+
+            <div className="flex gap-4">
+              <Button variant="outline" onClick={prevStep} className="border-white/10 text-white">
+                Back
+              </Button>
+              <Button
+                onClick={handleConfirm}
+                disabled={submitting || (!user && !guestEmail)}
+                className="flex-grow bg-primary hover:bg-primary/95 text-white text-base py-5"
+              >
+                {submitting ? "CONFIRMING..." : "CONFIRM & LOCK SLOT"}
+              </Button>
+            </div>
+          </div>
+        )}
+
+      </div>
+    </section>
+  );
 }
