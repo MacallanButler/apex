@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  basePath: '/apex',
+  reactStrictMode: true,
 };
 
 export default nextConfig;
