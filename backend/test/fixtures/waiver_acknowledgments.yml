@@ -1,0 +1,21 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  booking: one
+  age_confirmed: false
+  weight_confirmed: false
+  health_confirmed: false
+  alcohol_confirmed: false
+  risk_acknowledged: false
+  signed_at: 2026-07-17 06:00:35
+  ip_address: MyString
+
+two:
+  booking: two
+  age_confirmed: false
+  weight_confirmed: false
+  health_confirmed: false
+  alcohol_confirmed: false
+  risk_acknowledged: false
+  signed_at: 2026-07-17 06:00:35
+  ip_address: MyString

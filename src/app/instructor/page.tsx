@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { apiClient } from "@/lib/apiClient";
 import { useUser } from "@/lib/UserContext";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -14,11 +14,19 @@ interface Booking {
   date: string;
   time: string;
   package: string;
-  instructor: string;
+  instructor?: string;
+  instructor_id?: string;
   extras: string[];
   total: number;
   status?: string;
   student_email?: string;
+  guest_name?: string;
+  guest_email?: string;
+  time_slot?: {
+    date: string;
+    time: string;
+    location: string;
+  };
 }
 
 export default function InstructorDashboard() {
@@ -29,17 +37,36 @@ export default function InstructorDashboard() {
 
   const fetchBookings = async () => {
     setLoadingManifest(true);
-    const { data } = await supabase.from("bookings").select("*");
-    
-    // Sort bookings by date and time
-    const sorted = ((data as Booking[]) || []).sort((a, b) => {
-      const dateCompare = a.date.localeCompare(b.date);
-      if (dateCompare !== 0) return dateCompare;
-      return a.time.localeCompare(b.time);
-    });
+    try {
+      const data = await apiClient.getBookings();
+      
+      // Map API bookings structure to interface
+      const mapped: Booking[] = (data || []).map((b: any) => ({
+        id: b.id,
+        user_id: b.user_id,
+        date: b.time_slot?.date || "N/A",
+        time: b.time_slot?.time || "N/A",
+        package: b.package,
+        instructor: b.instructor_id ? "Sarah Connor" : "Any Available",
+        extras: b.extras || [],
+        total: b.total_cents / 100,
+        status: b.status,
+        student_email: b.guest_email || "anonymous@jumper.com"
+      }));
 
-    setBookings(sorted);
-    setLoadingManifest(false);
+      // Sort bookings by date and time
+      const sorted = mapped.sort((a, b) => {
+        const dateCompare = a.date.localeCompare(b.date);
+        if (dateCompare !== 0) return dateCompare;
+        return a.time.localeCompare(b.time);
+      });
+
+      setBookings(sorted);
+    } catch (err) {
+      console.error("Error fetching manifest:", err);
+    } finally {
+      setLoadingManifest(false);
+    }
   };
 
   useEffect(() => {
@@ -52,9 +79,46 @@ export default function InstructorDashboard() {
     }
   }, [user, profile, loading, router]);
 
+  // Connect to Action Cable channel for real-time manifest updates
+  useEffect(() => {
+    if (!user || profile?.role !== "instructor") return;
+
+    const wsUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000").replace(/^http/, "ws") + "/cable";
+    const socket = new WebSocket(wsUrl);
+
+    socket.onopen = () => {
+      socket.send(JSON.stringify({
+        command: "subscribe",
+        identifier: JSON.stringify({ channel: "ManifestChannel" })
+      }));
+    };
+
+    socket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "ping" || !data.message) return;
+
+        const msg = data.message;
+        if (msg.type === "booking_update") {
+          fetchBookings();
+        }
+      } catch (e) {
+        console.error("Action Cable manifest error:", e);
+      }
+    };
+
+    return () => {
+      socket.close();
+    };
+  }, [user, profile]);
+
   const updateStatus = async (id: string, newStatus: string) => {
-    await supabase.from("bookings").update({ status: newStatus }).eq("id", id);
-    fetchBookings();
+    try {
+      await apiClient.updateBookingStatus(id, newStatus);
+      fetchBookings();
+    } catch (err) {
+      alert("Failed to update status.");
+    }
   };
 
   if (loading || loadingManifest) {
@@ -70,16 +134,23 @@ export default function InstructorDashboard() {
 
   const getStatusBadge = (status?: string) => {
     switch (status) {
-      case "Completed":
+      case "completed":
         return (
           <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-950/60 text-emerald-300 border border-emerald-500/30">
             <CheckCircle2 className="w-3.5 h-3.5" /> Completed
           </span>
         );
+      case "weather_delayed":
       case "Weather Delayed":
         return (
           <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-950/60 text-amber-300 border border-amber-500/30">
             <CloudRain className="w-3.5 h-3.5" /> Weather Delay
+          </span>
+        );
+      case "pending_payment":
+        return (
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-zinc-800 text-zinc-400 border border-zinc-700">
+            <Clock className="w-3.5 h-3.5" /> Unpaid Deposit
           </span>
         );
       default:
@@ -93,7 +164,7 @@ export default function InstructorDashboard() {
 
   return (
     <div className="min-h-screen bg-background pt-24 pb-12 px-4 md:px-8">
-      <div className="max-w-6xl mx-auto space-y-8">
+      <div className="max-w-6xl mx-auto space-y-8 animate-fade-in">
         
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-white/10 pb-6">
@@ -126,7 +197,7 @@ export default function InstructorDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-blue-400">
-                {bookings.filter(b => !b.status || b.status === "Scheduled").length}
+                {bookings.filter(b => b.status === "scheduled").length}
               </div>
             </CardContent>
           </Card>
@@ -136,7 +207,7 @@ export default function InstructorDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-emerald-400">
-                {bookings.filter(b => b.status === "Completed").length}
+                {bookings.filter(b => b.status === "completed").length}
               </div>
             </CardContent>
           </Card>
@@ -197,7 +268,7 @@ export default function InstructorDashboard() {
                           {booking.package}
                         </td>
                         <td className="py-4 px-4 text-sm">
-                          {booking.instructor === "any" ? "Any Available" : booking.instructor}
+                          {booking.instructor}
                         </td>
                         <td className="py-4 px-4">
                           <div className="flex flex-wrap gap-1">
@@ -217,11 +288,11 @@ export default function InstructorDashboard() {
                         </td>
                         <td className="py-4 px-4 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            {(!booking.status || booking.status === "Scheduled") && (
+                            {booking.status === "scheduled" && (
                               <>
                                 <Button
                                   size="sm"
-                                  onClick={() => updateStatus(booking.id, "Completed")}
+                                  onClick={() => updateStatus(booking.id, "completed")}
                                   className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-8"
                                 >
                                   Complete
@@ -229,18 +300,18 @@ export default function InstructorDashboard() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => updateStatus(booking.id, "Weather Delayed")}
+                                  onClick={() => updateStatus(booking.id, "weather_delayed")}
                                   className="border-white/10 hover:bg-white/5 text-xs h-8 text-amber-400"
                                 >
                                   Delay
                                 </Button>
                               </>
                             )}
-                            {booking.status && booking.status !== "Scheduled" && (
+                            {booking.status && booking.status !== "scheduled" && booking.status !== "pending_payment" && (
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => updateStatus(booking.id, "Scheduled")}
+                                onClick={() => updateStatus(booking.id, "scheduled")}
                                 className="text-zinc-500 hover:text-white text-xs h-8"
                               >
                                 Revert to Scheduled

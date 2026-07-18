@@ -5,12 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { RoleSwitcher } from "@/components/features/RoleSwitcher";
 import { useUser } from "@/lib/UserContext";
-import { supabase } from "@/lib/supabase";
 
 export function Navbar() {
-  const { user, profile } = useUser();
+  const { user, profile, logout } = useUser();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -63,7 +61,7 @@ export function Navbar() {
           >
             FAQ
           </Link>
-          <RoleSwitcher />
+
 
           {profile?.role === "admin" && (
             <Link
@@ -87,8 +85,7 @@ export function Navbar() {
             <Button
               variant="outline"
               onClick={async () => {
-                await supabase.auth.signOut();
-                window.location.reload();
+                await logout();
               }}
             >
               Sign Out
@@ -144,7 +141,7 @@ export function Navbar() {
           >
             FAQ
           </Link>
-          <RoleSwitcher />
+
 
           {profile?.role === "admin" && (
             <Link
@@ -171,9 +168,8 @@ export function Navbar() {
               variant="outline"
               className="w-full"
               onClick={async () => {
-                await supabase.auth.signOut();
-                setIsMobileMenuOpen(false);
-                window.location.reload();
+                 await logout();
+                 setIsMobileMenuOpen(false);
               }}
             >
               Sign Out

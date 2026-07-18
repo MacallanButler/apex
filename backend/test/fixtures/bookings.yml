@@ -1,0 +1,29 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  user: one
+  guest_name: MyString
+  guest_email: MyString
+  guest_phone: MyString
+  time_slot: one
+  package: MyString
+  instructor_id: 1
+  extras: MyText
+  total_cents: 1
+  status: MyString
+  stripe_payment_intent_id: MyString
+  deposit_paid_cents: 1
+
+two:
+  user: two
+  guest_name: MyString
+  guest_email: MyString
+  guest_phone: MyString
+  time_slot: two
+  package: MyString
+  instructor_id: 1
+  extras: MyText
+  total_cents: 1
+  status: MyString
+  stripe_payment_intent_id: MyString
+  deposit_paid_cents: 1

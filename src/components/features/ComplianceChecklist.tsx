@@ -21,7 +21,7 @@ const prerequisites: Prerequisite[] = [
 ]
 
 interface ComplianceChecklistProps {
-    onComplete: () => void
+    onComplete: (checked: Record<string, boolean>) => void
 }
 
 export function ComplianceChecklist({ onComplete }: ComplianceChecklistProps) {
@@ -97,7 +97,7 @@ export function ComplianceChecklist({ onComplete }: ComplianceChecklistProps) {
             <Button
                 className="w-full gap-2"
                 disabled={!allChecked}
-                onClick={onComplete}
+                onClick={() => onComplete(checked)}
             >
                 {allChecked
                     ? <><Unlock className="w-4 h-4" /> Proceed to Booking</>

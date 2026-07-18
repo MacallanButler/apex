@@ -1,24 +1,34 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { supabase } from "./supabase";
+import { apiClient } from "./apiClient";
 
 interface Profile {
   id: string;
   role: string;
-  [key: string]: any;
+  name: string;
+  phone?: string;
+  email: string;
 }
 
 interface UserContextValue {
   user: { id: string; email?: string } | null;
   profile: Profile | null;
   loading: boolean;
+  login: (email: string) => Promise<void>;
+  register: (email: string, name: string, phone?: string) => Promise<void>;
+  logout: () => Promise<void>;
+  refresh: () => Promise<void>;
 }
 
 const UserContext = createContext<UserContextValue>({
   user: null,
   profile: null,
   loading: true,
+  login: async () => {},
+  register: async () => {},
+  logout: async () => {},
+  refresh: async () => {},
 });
 
 export function UserProvider({ children }: { children: ReactNode }) {
@@ -26,37 +36,63 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      const currentUser = data.user;
-      setUser(currentUser ? { id: currentUser.id, email: currentUser.email } : null);
-
+  const fetchUser = async () => {
+    try {
+      const currentUser = await apiClient.me();
       if (currentUser) {
-        const { data: profileData } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", currentUser.id)
-          .single();
-        setProfile((profileData as Profile) || null);
+        setUser({ id: currentUser.id, email: currentUser.email });
+        setProfile(currentUser);
+      } else {
+        setUser(null);
+        setProfile(null);
       }
-
+    } catch (_) {
+      setUser(null);
+      setProfile(null);
+    } finally {
       setLoading(false);
-    };
+    }
+  };
 
+  useEffect(() => {
     fetchUser();
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
-      const currentUser = session?.user;
-      setUser(currentUser ? { id: currentUser.id, email: currentUser.email } : null);
-      if (!currentUser) setProfile(null);
-    });
-
-    return () => listener?.subscription.unsubscribe();
   }, []);
 
+  const login = async (email: string) => {
+    setLoading(true);
+    try {
+      const loggedInUser = await apiClient.login(email);
+      setUser({ id: loggedInUser.id, email: loggedInUser.email });
+      setProfile(loggedInUser);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const register = async (email: string, name: string, phone?: string) => {
+    setLoading(true);
+    try {
+      const registeredUser = await apiClient.register(email, name, phone);
+      setUser({ id: registeredUser.id, email: registeredUser.email });
+      setProfile(registeredUser);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const logout = async () => {
+    setLoading(true);
+    try {
+      await apiClient.logout();
+      setUser(null);
+      setProfile(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <UserContext.Provider value={{ user, profile, loading }}>
+    <UserContext.Provider value={{ user, profile, loading, login, register, logout, refresh: fetchUser }}>
       {children}
     </UserContext.Provider>
   );

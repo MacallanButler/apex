@@ -1,0 +1,17 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  recorded_at: 2026-07-17 06:00:44
+  wind_kts: 9.99
+  ceiling_ft: 1
+  temp_f: 1
+  visibility: MyString
+  status: MyString
+
+two:
+  recorded_at: 2026-07-17 06:00:44
+  wind_kts: 9.99
+  ceiling_ft: 1
+  temp_f: 1
+  visibility: MyString
+  status: MyString

@@ -1,0 +1,10 @@
+# Solid Queue recurring scheduler configuration for Rails 8
+production:
+  weather_polling:
+    class: WeatherPollingJob
+    schedule: "*/15 * * * *"
+
+development:
+  weather_polling:
+    class: WeatherPollingJob
+    schedule: "*/15 * * * *"

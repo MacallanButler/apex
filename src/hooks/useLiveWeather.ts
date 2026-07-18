@@ -1,62 +1,101 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react";
+import { apiClient } from "@/lib/apiClient";
 
 interface WeatherReading {
-    windKts: number
-    ceilingFt: number
-    tempF: number
-    visibility: "Clear" | "Partly Cloudy" | "Overcast"
-    status: "GO" | "MARGINAL" | "NO-GO"
-    statusColor: "green" | "yellow" | "red"
+  windKts: number;
+  ceilingFt: number;
+  tempF: number;
+  visibility: string;
+  status: "GO" | "MARGINAL" | "NO-GO";
+  statusColor: "green" | "yellow" | "red";
 }
 
-// Weighted set of realistic weather states that cycle with added noise
-const baseStates: Omit<WeatherReading, "status" | "statusColor">[] = [
-    { windKts: 5, ceilingFt: 12000, tempF: 74, visibility: "Clear" },
-    { windKts: 8, ceilingFt: 10500, tempF: 71, visibility: "Clear" },
-    { windKts: 12, ceilingFt: 8000, tempF: 68, visibility: "Partly Cloudy" },
-    { windKts: 18, ceilingFt: 6500, tempF: 65, visibility: "Partly Cloudy" },
-    { windKts: 22, ceilingFt: 4500, tempF: 62, visibility: "Overcast" },
-    { windKts: 28, ceilingFt: 3000, tempF: 60, visibility: "Overcast" },
-]
-
-function classifyStatus(reading: Omit<WeatherReading, "status" | "statusColor">): Pick<WeatherReading, "status" | "statusColor"> {
-    const noGo = reading.windKts > 25 || reading.ceilingFt < 4000
-    const marginal = reading.windKts > 15 || reading.ceilingFt < 7000
-
-    if (noGo) return { status: "NO-GO", statusColor: "red" }
-    if (marginal) return { status: "MARGINAL", statusColor: "yellow" }
-    return { status: "GO", statusColor: "green" }
+function getStatusColor(status: string) {
+  const norm = status.toLowerCase();
+  if (norm === "no_go" || norm === "no-go") return "red";
+  if (norm === "marginal") return "yellow";
+  return "green";
 }
 
-function addNoise(base: typeof baseStates[0]): Omit<WeatherReading, "status" | "statusColor"> {
-    return {
-        windKts: Math.max(0, base.windKts + Math.round((Math.random() - 0.5) * 4)),
-        ceilingFt: Math.max(1000, base.ceilingFt + Math.round((Math.random() - 0.5) * 500)),
-        tempF: Math.round(base.tempF + (Math.random() - 0.5) * 3),
-        visibility: base.visibility,
+function getDisplayStatus(status: string) {
+  const norm = status.toLowerCase();
+  if (norm === "no_go" || norm === "no-go") return "NO-GO";
+  if (norm === "marginal") return "MARGINAL";
+  return "GO";
+}
+
+export function useLiveWeather(): WeatherReading {
+  const [weather, setWeather] = useState<WeatherReading>({
+    windKts: 10,
+    ceilingFt: 10000,
+    tempF: 72,
+    visibility: "10sm",
+    status: "GO",
+    statusColor: "green"
+  });
+
+  const fetchWeather = async () => {
+    try {
+      const data = await apiClient.getCurrentWeather();
+      if (data) {
+        setWeather({
+          windKts: Number(data.wind_kts),
+          ceilingFt: data.ceiling_ft,
+          tempF: data.temp_f,
+          visibility: data.visibility,
+          status: getDisplayStatus(data.status),
+          statusColor: getStatusColor(data.status)
+        });
+      }
+    } catch (e) {
+      console.error("Error fetching weather:", e);
     }
-}
+  };
 
-export function useLiveWeather(intervalMs = 4000): WeatherReading {
-    const [stateIndex, setStateIndex] = useState(0)
-    const [reading, setReading] = useState<WeatherReading>(() => {
-        const base = addNoise(baseStates[0])
-        return { ...base, ...classifyStatus(base) }
-    })
+  useEffect(() => {
+    fetchWeather();
 
-    const tick = useCallback(() => {
-        setStateIndex(prev => {
-            const nextIndex = (prev + 1) % baseStates.length
-            const base = addNoise(baseStates[nextIndex])
-            setReading({ ...base, ...classifyStatus(base) })
-            return nextIndex
-        })
-    }, [stateIndex])
+    // Fallback polling
+    const interval = setInterval(fetchWeather, 60000);
 
-    useEffect(() => {
-        const timer = setInterval(tick, intervalMs)
-        return () => clearInterval(timer)
-    }, [tick, intervalMs])
+    // WebSocket sync
+    const wsUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000").replace(/^http/, "ws") + "/cable";
+    const socket = new WebSocket(wsUrl);
 
-    return reading
+    socket.onopen = () => {
+      socket.send(JSON.stringify({
+        command: "subscribe",
+        identifier: JSON.stringify({ channel: "SlotsChannel" })
+      }));
+    };
+
+    socket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "ping" || !data.message) return;
+
+        const msg = data.message;
+        if (msg.type === "weather_update") {
+          const w = msg.weather;
+          setWeather({
+            windKts: Number(w.wind_kts),
+            ceilingFt: w.ceiling_ft,
+            tempF: w.temp_f,
+            visibility: w.visibility,
+            status: getDisplayStatus(w.status),
+            statusColor: getStatusColor(w.status)
+          });
+        }
+      } catch (e) {
+        console.error("Action Cable weather update error:", e);
+      }
+    };
+
+    return () => {
+      clearInterval(interval);
+      socket.close();
+    };
+  }, []);
+
+  return weather;
 }
